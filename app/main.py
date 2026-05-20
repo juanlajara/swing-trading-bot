@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from app.config import CRYPTO_SYMBOLS, TICKER_ALIASES, WATCHLIST_SET, settings
 from app.executor import execute_signal
-from app.journal import init_db, log_trade
+from app.journal import init_db, log_trade, get_trades
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,13 @@ def webhook(payload: WebhookPayload) -> dict:
 
     logger.info("webhook_processed ticker=%s action=%s order_id=%s", ticker, action, result["order_id"])
     return result
+
+
+@app.get("/trades")
+def trades(secret: str, limit: int = 100) -> list:
+    if secret != settings.webhook_secret:
+        raise HTTPException(status_code=401, detail="invalid secret")
+    return get_trades(limit=limit)
 
 
 @app.get("/health")

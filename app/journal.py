@@ -40,3 +40,12 @@ def log_trade(
             (ts, ticker, side, qty, order_id, filled_avg_price, signal_source),
         )
     logger.info("trade_logged ticker=%s side=%s qty=%s order_id=%s", ticker, side, qty, order_id)
+
+
+def get_trades(limit: int = 100) -> list[dict]:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM trades ORDER BY ts DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(row) for row in rows]
