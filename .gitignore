@@ -6,18 +6,8 @@
 secrets.*
 __pycache__/
 *.pyc
+*.pyo
 .venv/
-node_modules/
-.DS_Store
-EOFcat > .gitignore << 'EOF'
-.env
-.env.*
-!.env.example
-*.key
-*.pem
-secrets.*
-__pycache__/
-*.pyc
-.venv/
-node_modules/
+.pytest_cache/
+*.db
 .DS_Store
