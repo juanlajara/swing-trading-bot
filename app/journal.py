@@ -1,10 +1,13 @@
 from __future__ import annotations
 import logging
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB_PATH = Path("trades.db")
+# On Railway, mount a persistent volume at /data and set DB_PATH=/data/trades.db.
+# Falls back to local trades.db for development.
+DB_PATH = Path(os.environ.get("DB_PATH", "trades.db"))
 logger = logging.getLogger(__name__)
 
 
