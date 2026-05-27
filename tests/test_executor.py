@@ -36,8 +36,8 @@ def _make_crypto_data_client(symbol: str, price: float) -> MagicMock:
     return client
 
 
-# equity=200_000, watchlist_size=20 → allocation=10_000
-# price=100 → qty=100.0
+# equity=200_000, position_size_pct=0.02 → allocation=4_000
+# price=100 → qty=40.0
 
 def test_buy_closes_position_and_opens_long():
     trading = _make_trading_client(equity=200_000.0)
@@ -48,7 +48,7 @@ def test_buy_closes_position_and_opens_long():
     trading.close_position.assert_called_once_with("NVDA")
     req = trading.submit_order.call_args[0][0]
     assert req.side == OrderSide.BUY
-    assert req.qty == pytest.approx(100.0)
+    assert req.qty == pytest.approx(40.0)
     assert result["side"] == "buy"
     assert result["order_id"] == "order-123"
 
@@ -62,7 +62,7 @@ def test_sell_closes_position_and_opens_short():
     trading.close_position.assert_called_once_with("NVDA")
     req = trading.submit_order.call_args[0][0]
     assert req.side == OrderSide.SELL
-    assert req.qty == pytest.approx(100.0)
+    assert req.qty == pytest.approx(40.0)
     assert result["side"] == "sell"
 
 
@@ -118,4 +118,4 @@ def test_fractional_qty_not_floored():
     execute_signal("BTC/USD", "buy", trading, data)
 
     req = trading.submit_order.call_args[0][0]
-    assert req.qty == pytest.approx(10_000.0 / 30_000.0, rel=1e-6)
+    assert req.qty == pytest.approx(4_000.0 / 30_000.0, rel=1e-6)

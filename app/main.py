@@ -6,7 +6,7 @@ from alpaca.trading.client import TradingClient
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.config import CRYPTO_SYMBOLS, TICKER_ALIASES, WATCHLIST_SET, settings
+from app.config import CRYPTO_SYMBOLS, TICKER_ALIASES, settings
 from app.executor import execute_signal
 from app.journal import init_db, log_trade, get_trades
 
@@ -48,9 +48,6 @@ def webhook(payload: WebhookPayload) -> dict:
         raise HTTPException(status_code=401, detail="invalid secret")
 
     ticker = TICKER_ALIASES.get(payload.ticker.upper(), payload.ticker.upper())
-    if ticker not in WATCHLIST_SET:
-        raise HTTPException(status_code=400, detail=f"{ticker} not in watchlist")
-
     action = payload.action.lower()
     if action not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail=f"invalid action: {action}")

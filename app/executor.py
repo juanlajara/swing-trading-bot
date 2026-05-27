@@ -7,7 +7,7 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
 
-from app.config import CRYPTO_SYMBOLS, WATCHLIST_SIZE
+from app.config import CRYPTO_SYMBOLS, settings
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def execute_signal(
     data_client,
 ) -> dict:
     account = trading_client.get_account()
-    allocation = float(account.equity) / WATCHLIST_SIZE
+    allocation = float(account.equity) * settings.position_size_pct
 
     try:
         trading_client.close_position(symbol)
