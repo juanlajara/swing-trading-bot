@@ -44,6 +44,8 @@ class WebhookPayload(BaseModel):
 
 @app.post("/webhook")
 def webhook(payload: WebhookPayload) -> dict:
+    logger.info("webhook_received ticker=%s action=%s", payload.ticker, payload.action)
+
     if payload.secret != settings.webhook_secret:
         raise HTTPException(status_code=401, detail="invalid secret")
 
@@ -53,7 +55,11 @@ def webhook(payload: WebhookPayload) -> dict:
         raise HTTPException(status_code=400, detail=f"invalid action: {action}")
 
     data_client = _crypto_data_client if ticker in CRYPTO_SYMBOLS else _stock_data_client
-    result = execute_signal(ticker, action, _trading_client, data_client)
+    try:
+        result = execute_signal(ticker, action, _trading_client, data_client)
+    except Exception as exc:
+        logger.error("execute_signal_failed ticker=%s action=%s error=%s", ticker, action, exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     log_trade(
         ticker=ticker,
