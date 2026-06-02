@@ -1,9 +1,12 @@
+import math
+import threading
+
 import pytest
 from unittest.mock import MagicMock
 from alpaca.common.exceptions import APIError
 from alpaca.trading.enums import OrderSide, TimeInForce
 
-from app.executor import execute_signal
+from app.executor import execute_signal, _get_ticker_lock
 
 
 def _make_404_api_error() -> APIError:
@@ -21,6 +24,9 @@ def _make_trading_client(equity: float = 200_000.0, order_id: str = "order-123")
     order.id = order_id
     order.filled_avg_price = None
     client.submit_order.return_value = order
+    client.get_orders.return_value = []
+    # Simulate position clearing immediately after close
+    client.get_open_position.side_effect = _make_404_api_error()
     return client
 
 
@@ -110,8 +116,8 @@ def test_crypto_uses_gtc_time_in_force():
     assert req.time_in_force == TimeInForce.GTC
 
 
-def test_fractional_qty_not_floored():
-    # allocation=10_000, price=30_000 → qty=0.3333...
+def test_buy_qty_allows_fractional():
+    # allocation=4_000, price=30_000 → qty=0.1333...
     trading = _make_trading_client(equity=200_000.0)
     data = _make_crypto_data_client("BTC/USD", price=30_000.0)
 
@@ -119,3 +125,50 @@ def test_fractional_qty_not_floored():
 
     req = trading.submit_order.call_args[0][0]
     assert req.qty == pytest.approx(4_000.0 / 30_000.0, rel=1e-6)
+
+
+def test_short_qty_is_floored_to_whole_shares():
+    # allocation=4_000, price=150 → 4000/150=26.666... → floor=26
+    trading = _make_trading_client(equity=200_000.0)
+    data = _make_stock_data_client("NVDA", price=150.0)
+
+    execute_signal("NVDA", "sell", trading, data)
+
+    req = trading.submit_order.call_args[0][0]
+    assert req.qty == 26
+    assert req.qty == math.floor(4_000.0 / 150.0)
+
+
+def test_waits_for_position_to_clear_before_new_order():
+    trading = _make_trading_client()
+    data = _make_stock_data_client("NVDA", price=100.0)
+
+    execute_signal("NVDA", "sell", trading, data)
+
+    # get_open_position must be called after close_position to confirm flat
+    trading.get_open_position.assert_called_with("NVDA")
+
+
+def test_open_orders_cancelled_before_close():
+    trading = _make_trading_client()
+    stale_order = MagicMock()
+    stale_order.id = "stale-order-id"
+    trading.get_orders.return_value = [stale_order]
+    data = _make_stock_data_client("NVDA", price=100.0)
+
+    execute_signal("NVDA", "sell", trading, data)
+
+    trading.cancel_order_by_id.assert_called_once_with("stale-order-id")
+
+
+def test_duplicate_signal_is_skipped():
+    trading = _make_trading_client()
+    data = _make_stock_data_client("AAPL", price=100.0)
+
+    lock = _get_ticker_lock("AAPL")
+    lock.acquire()
+    try:
+        with pytest.raises(RuntimeError, match="duplicate signal"):
+            execute_signal("AAPL", "buy", trading, data)
+    finally:
+        lock.release()
