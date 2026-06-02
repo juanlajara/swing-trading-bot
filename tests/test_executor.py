@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from alpaca.common.exceptions import APIError
 from alpaca.trading.enums import OrderSide, TimeInForce
 
-from app.executor import execute_signal, _get_ticker_lock
+from app.executor import execute_signal, _get_ticker_lock, _wait_for_flat
 
 
 def _make_404_api_error() -> APIError:
@@ -159,6 +159,21 @@ def test_open_orders_cancelled_before_close():
     execute_signal("NVDA", "sell", trading, data)
 
     trading.cancel_order_by_id.assert_called_once_with("stale-order-id")
+
+
+def test_close_timeout_cancels_order_and_raises():
+    # Simulates after-hours: position never clears within timeout
+    trading = _make_trading_client()
+    trading.get_open_position.side_effect = None
+    trading.get_open_position.return_value = MagicMock()  # always returns a position
+    pending_close = MagicMock()
+    pending_close.id = "pending-close-id"
+    trading.get_orders.return_value = [pending_close]
+
+    with pytest.raises(RuntimeError, match="did not fill"):
+        _wait_for_flat("BOIL", trading, timeout=0)  # 0s timeout = expire immediately
+
+    trading.cancel_order_by_id.assert_called_with("pending-close-id")
 
 
 def test_duplicate_signal_is_skipped():

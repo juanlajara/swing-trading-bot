@@ -45,7 +45,11 @@ def _cancel_open_orders(symbol: str, trading_client: TradingClient) -> None:
 
 
 def _wait_for_flat(symbol: str, trading_client: TradingClient, timeout: int = 15) -> None:
-    """Poll until position is closed or timeout. Prevents shorting into a pending close order."""
+    """Poll until position is closed. On timeout, cancels the pending close order and raises.
+
+    After-hours DAY orders don't fill, so we cancel rather than leave a stale close
+    order that would cause a wash-trade rejection on the next submit.
+    """
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -55,7 +59,11 @@ def _wait_for_flat(symbol: str, trading_client: TradingClient, timeout: int = 15
                 return
             raise
         time.sleep(0.5)
-    logger.warning("position_close_timeout symbol=%s", symbol)
+    _cancel_open_orders(symbol, trading_client)
+    raise RuntimeError(
+        f"close order for {symbol} did not fill within {timeout}s "
+        "(likely after-hours); close order cancelled, position unchanged"
+    )
 
 
 def _get_latest_price(symbol: str, data_client) -> float:
