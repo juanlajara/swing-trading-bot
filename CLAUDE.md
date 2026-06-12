@@ -66,8 +66,9 @@ webhook alerts → Railway service receives them → Alpaca REST API executes or
   up to 15 seconds. On timeout (e.g. after-hours), it cancels the pending close
   order and raises — it does NOT proceed to open a new position. This prevents
   unintended position doubling.
-- **After-hours behavior:** DAY orders don't fill after-hours. On timeout, cancel
-  the close order and surface an error. The position is left unchanged.
+- **After-hours behavior:** DAY orders don't fill after-hours. On timeout, the close
+  order is left open to fill at the next market open — it is NOT cancelled. The new-direction
+  entry is skipped; the next 4-hour bar signal re-triggers if the strategy still calls for it.
 - **Fractional shorts are forbidden by Alpaca:** short-sell qty is `math.floor`'d
   to whole shares. Long (buy) qty allows fractional shares (rounded to 9 decimal places).
 - **Crypto uses GTC time-in-force; stocks use DAY.** Crypto markets run 24/7 so
