@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from alpaca.common.exceptions import APIError
 from alpaca.trading.enums import OrderSide, TimeInForce
 
-from app.executor import execute_signal, _get_ticker_lock, _wait_for_flat
+from app.executor import execute_signal, _get_ticker_lock, _wait_for_flat, _wait_for_fill
 
 
 def _make_404_api_error() -> APIError:
@@ -17,7 +17,11 @@ def _make_404_api_error() -> APIError:
     return APIError({"message": "position does not exist"}, http_error=mock_http_error)
 
 
-def _make_trading_client(equity: float = 200_000.0, order_id: str = "order-123") -> MagicMock:
+def _make_trading_client(
+    equity: float = 200_000.0,
+    order_id: str = "order-123",
+    filled_avg_price: float = 100.0,
+) -> MagicMock:
     client = MagicMock()
     client.get_account.return_value.equity = str(equity)
     order = MagicMock()
@@ -27,6 +31,10 @@ def _make_trading_client(equity: float = 200_000.0, order_id: str = "order-123")
     client.get_orders.return_value = []
     # Simulate position clearing immediately after close
     client.get_open_position.side_effect = _make_404_api_error()
+    # Simulate fill confirmation on first poll
+    filled_order = MagicMock()
+    filled_order.filled_avg_price = filled_avg_price
+    client.get_order_by_id.return_value = filled_order
     return client
 
 
@@ -172,6 +180,26 @@ def test_close_timeout_raises_without_cancelling_order():
         _wait_for_flat("BOIL", trading, timeout=0)  # 0s timeout = expire immediately
 
     trading.cancel_order_by_id.assert_not_called()
+
+
+def test_filled_avg_price_is_populated():
+    trading = _make_trading_client(equity=200_000.0, filled_avg_price=98.50)
+    data = _make_stock_data_client("NVDA", price=100.0)
+
+    result = execute_signal("NVDA", "buy", trading, data)
+
+    assert result["filled_avg_price"] == pytest.approx(98.50)
+
+
+def test_filled_avg_price_is_none_when_fill_times_out():
+    trading = _make_trading_client()
+    unfilled_order = MagicMock()
+    unfilled_order.filled_avg_price = None
+    trading.get_order_by_id.return_value = unfilled_order
+
+    result = _wait_for_fill("order-123", trading, timeout=0)
+
+    assert result is None
 
 
 def test_duplicate_signal_is_skipped():

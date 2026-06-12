@@ -44,6 +44,17 @@ def _cancel_open_orders(symbol: str, trading_client: TradingClient) -> None:
         pass
 
 
+def _wait_for_fill(order_id: str, trading_client: TradingClient, timeout: int = 10) -> float | None:
+    """Poll until the order has a filled_avg_price. Returns None if not filled within timeout."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        order = trading_client.get_order_by_id(order_id)
+        if order.filled_avg_price is not None:
+            return float(order.filled_avg_price)
+        time.sleep(0.5)
+    return None
+
+
 def _wait_for_flat(symbol: str, trading_client: TradingClient, timeout: int = 15) -> None:
     """Poll until position is closed. On timeout, raises without cancelling the close order.
 
@@ -136,12 +147,16 @@ def _execute(
         MarketOrderRequest(symbol=symbol, qty=qty, side=side, time_in_force=tif)
     )
 
-    logger.info("order_submitted symbol=%s side=%s qty=%s order_id=%s", symbol, action, qty, order.id)
+    filled_avg_price = _wait_for_fill(str(order.id), trading_client)
+    logger.info(
+        "order_submitted symbol=%s side=%s qty=%s order_id=%s filled_avg_price=%s",
+        symbol, action, qty, order.id, filled_avg_price,
+    )
 
     return {
         "order_id": str(order.id),
         "symbol": symbol,
         "side": action,
         "qty": qty,
-        "filled_avg_price": getattr(order, "filled_avg_price", None),
+        "filled_avg_price": filled_avg_price,
     }
