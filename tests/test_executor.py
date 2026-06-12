@@ -161,19 +161,17 @@ def test_open_orders_cancelled_before_close():
     trading.cancel_order_by_id.assert_called_once_with("stale-order-id")
 
 
-def test_close_timeout_cancels_order_and_raises():
-    # Simulates after-hours: position never clears within timeout
+def test_close_timeout_raises_without_cancelling_order():
+    # Simulates after-hours: position never clears within timeout.
+    # Close order must be left open so it fills at next market open.
     trading = _make_trading_client()
     trading.get_open_position.side_effect = None
     trading.get_open_position.return_value = MagicMock()  # always returns a position
-    pending_close = MagicMock()
-    pending_close.id = "pending-close-id"
-    trading.get_orders.return_value = [pending_close]
 
     with pytest.raises(RuntimeError, match="did not fill"):
         _wait_for_flat("BOIL", trading, timeout=0)  # 0s timeout = expire immediately
 
-    trading.cancel_order_by_id.assert_called_with("pending-close-id")
+    trading.cancel_order_by_id.assert_not_called()
 
 
 def test_duplicate_signal_is_skipped():

@@ -45,10 +45,11 @@ def _cancel_open_orders(symbol: str, trading_client: TradingClient) -> None:
 
 
 def _wait_for_flat(symbol: str, trading_client: TradingClient, timeout: int = 15) -> None:
-    """Poll until position is closed. On timeout, cancels the pending close order and raises.
+    """Poll until position is closed. On timeout, raises without cancelling the close order.
 
-    After-hours DAY orders don't fill, so we cancel rather than leave a stale close
-    order that would cause a wash-trade rejection on the next submit.
+    The close order is left open so it fills at the next market open (correct behavior
+    for 4-hour swing signals). The new-direction entry is skipped; the next bar's signal
+    will re-trigger if appropriate.
     """
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -59,10 +60,9 @@ def _wait_for_flat(symbol: str, trading_client: TradingClient, timeout: int = 15
                 return
             raise
         time.sleep(0.5)
-    _cancel_open_orders(symbol, trading_client)
     raise RuntimeError(
         f"close order for {symbol} did not fill within {timeout}s "
-        "(likely after-hours); close order cancelled, position unchanged"
+        "(likely after-hours); close order left open to fill at market open"
     )
 
 
