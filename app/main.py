@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -42,8 +43,25 @@ class WebhookPayload(BaseModel):
     secret: str
 
 
+def _process_signal(ticker: str, action: str) -> None:
+    data_client = _crypto_data_client if ticker in CRYPTO_SYMBOLS else _stock_data_client
+    try:
+        result = execute_signal(ticker, action, _trading_client, data_client)
+    except Exception as exc:
+        logger.error("execute_signal_failed ticker=%s action=%s error=%s", ticker, action, exc)
+        return
+    log_trade(
+        ticker=ticker,
+        side=action,
+        qty=result["qty"],
+        order_id=result["order_id"],
+        filled_avg_price=result.get("filled_avg_price"),
+    )
+    logger.info("webhook_processed ticker=%s action=%s order_id=%s", ticker, action, result["order_id"])
+
+
 @app.post("/webhook")
-def webhook(payload: WebhookPayload) -> dict:
+async def webhook(payload: WebhookPayload) -> dict:
     logger.info("webhook_received ticker=%s action=%s", payload.ticker, payload.action)
 
     if payload.secret != settings.webhook_secret:
@@ -54,23 +72,14 @@ def webhook(payload: WebhookPayload) -> dict:
     if action not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail=f"invalid action: {action}")
 
-    data_client = _crypto_data_client if ticker in CRYPTO_SYMBOLS else _stock_data_client
-    try:
-        result = execute_signal(ticker, action, _trading_client, data_client)
-    except Exception as exc:
-        logger.error("execute_signal_failed ticker=%s action=%s error=%s", ticker, action, exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    # Return 200 immediately — TradingView times out webhooks after ~3 seconds,
+    # but order execution (close + wait for flat + open) can take up to 25 seconds.
+    # Processing runs in the default thread pool so the event loop stays unblocked.
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _process_signal, ticker, action)
 
-    log_trade(
-        ticker=ticker,
-        side=action,
-        qty=result["qty"],
-        order_id=result["order_id"],
-        filled_avg_price=result.get("filled_avg_price"),
-    )
-
-    logger.info("webhook_processed ticker=%s action=%s order_id=%s", ticker, action, result["order_id"])
-    return result
+    logger.info("webhook_queued ticker=%s action=%s", ticker, action)
+    return {"status": "queued", "ticker": ticker, "action": action}
 
 
 @app.get("/trades")
