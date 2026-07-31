@@ -79,9 +79,10 @@ webhook alerts → Railway service receives them → Alpaca REST API executes or
   symbol are cancelled to prevent wash-trade rejections on the new submission.
 
 ### Crypto support
-- Supported symbols: `BTC/USD`, `ETH/USD`.
-- TradingView sends `BTCUSD` / `ETHUSD` — normalized via `TICKER_ALIASES` in
-  `app/config.py` before any Alpaca call.
+- Supported symbols: `BTC/USD`, `ETH/USD`, `SOL/USD`, `XRP/USD`, `DOGE/USD`,
+  `ADA/USD`, `AVAX/USD`, `LINK/USD`, `DOT/USD`, `UNI/USD`, `AAVE/USD`.
+- TradingView sends the no-slash form (e.g. `BTCUSD`, `SOLUSD`) — normalized via
+  `TICKER_ALIASES` in `app/config.py` before any Alpaca call.
 - Crypto uses `CryptoHistoricalDataClient`; stocks use `StockHistoricalDataClient`.
 
 ### Webhook authentication

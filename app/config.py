@@ -1,11 +1,32 @@
 from pydantic_settings import BaseSettings
 
-CRYPTO_SYMBOLS: set[str] = {"BTC/USD", "ETH/USD"}
+CRYPTO_SYMBOLS: set[str] = {
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "XRP/USD",
+    "DOGE/USD",
+    "ADA/USD",
+    "AVAX/USD",
+    "LINK/USD",
+    "DOT/USD",
+    "UNI/USD",
+    "AAVE/USD",
+}
 
 # TradingView may send crypto as "BTCUSD" — normalize to Alpaca's format
 TICKER_ALIASES: dict[str, str] = {
     "BTCUSD": "BTC/USD",
     "ETHUSD": "ETH/USD",
+    "SOLUSD": "SOL/USD",
+    "XRPUSD": "XRP/USD",
+    "DOGEUSD": "DOGE/USD",
+    "ADAUSD": "ADA/USD",
+    "AVAXUSD": "AVAX/USD",
+    "LINKUSD": "LINK/USD",
+    "DOTUSD": "DOT/USD",
+    "UNIUSD": "UNI/USD",
+    "AAVEUSD": "AAVE/USD",
 }
 
 
